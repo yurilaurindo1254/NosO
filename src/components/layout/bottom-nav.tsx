@@ -1,8 +1,8 @@
-"use client";
+"use client"; // force update
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CheckSquare, Sparkles, Wallet, Heart } from "lucide-react";
+import { Home, CheckSquare, Sparkles, Wallet, Heart, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -11,6 +11,7 @@ const items = [
   { icon: Sparkles, label: "IA", href: "/planner" },
   { icon: Wallet, label: "Finance", href: "/finance" },
   { icon: Heart, label: "Wishlist", href: "/wishlist" },
+  { icon: Settings, label: "Config", href: "/settings" },
 ];
 
 export function BottomNav() {

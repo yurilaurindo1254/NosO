@@ -1,22 +1,58 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Smile, Frown, Meh, Heart, Coffee, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { supabase } from "@/lib/supabase";
 
 const moods = [
-  { icon: Smile, label: "Happy", color: "text-yellow-500", bg: "bg-yellow-50", emoji: "😊" },
-  { icon: Heart, label: "Loved", color: "text-rose-500", bg: "bg-rose-50", emoji: "❤️" },
-  { icon: Coffee, label: "Relaxed", color: "text-amber-600", bg: "bg-amber-50", emoji: "☕" },
-  { icon: Meh, label: "Neutral", color: "text-slate-500", bg: "bg-slate-50", emoji: "😐" },
-  { icon: Frown, label: "Tired", color: "text-blue-500", bg: "bg-blue-50", emoji: "😴" },
-  { icon: Moon, label: "Sleepy", color: "text-indigo-500", bg: "bg-indigo-50", emoji: "🌙" },
+  { icon: Smile, label: "Happy", emoji: "😊" },
+  { icon: Heart, label: "Loved", emoji: "❤️" },
+  { icon: Coffee, label: "Relaxed", emoji: "☕" },
+  { icon: Meh, label: "Neutral", emoji: "😐" },
+  { icon: Frown, label: "Tired", emoji: "😴" },
+  { icon: Moon, label: "Sleepy", emoji: "🌙" },
 ];
 
 export function VibeCheck() {
   const [selected, setSelected] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // 1. Carregar usuário e último humor ao iniciar
+  useEffect(() => {
+    const fetchVibe = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+        // Pega o último vibe check deste usuário
+        const { data } = await supabase
+          .from('vibe_check')
+          .select('mood_status')
+          .eq('profile_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (data) setSelected(data.mood_status);
+      }
+    };
+    fetchVibe();
+  }, []);
+
+  // 2. Salvar quando clicar
+  const handleSelect = async (moodLabel: string) => {
+    setSelected(moodLabel);
+    if (!userId) return;
+
+    // Simplificação: vamos usar o ID do usuário como couple_id por enquanto se não tiver parceiro
+    // Idealmente você buscaria o profile.partner_id
+    await supabase.from('vibe_check').insert({
+        profile_id: userId,
+        mood_status: moodLabel,
+        couple_id: userId // TODO: Ajustar isso quando tiver a lógica de linkar casal
+    });
+  };
 
   return (
     <Card className="glass-card overflow-hidden border-none p-8 transition-all hover:shadow-primary/5">
@@ -30,7 +66,7 @@ export function VibeCheck() {
           {moods.map((mood) => (
             <button
               key={mood.label}
-              onClick={() => setSelected(mood.label)}
+              onClick={() => handleSelect(mood.label)}
               className={cn(
                 "group relative flex h-20 w-20 flex-col items-center justify-center gap-2 rounded-2xl transition-all duration-300",
                 selected === mood.label 
@@ -40,9 +76,6 @@ export function VibeCheck() {
             >
               <span className="text-3xl transition-transform duration-500 group-hover:scale-125">{mood.emoji}</span>
               <span className="text-[10px] font-bold uppercase tracking-widest">{mood.label}</span>
-              {selected === mood.label && (
-                <div className="absolute inset-0 rounded-2xl border-2 border-primary-foreground/30 animate-pulse" />
-              )}
             </button>
           ))}
         </div>

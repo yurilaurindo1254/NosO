@@ -56,10 +56,12 @@ export function Sidebar() {
         </nav>
 
         <div className="mt-auto space-y-4 pt-8 border-t border-white/5">
-          <Button variant="ghost" className="w-full justify-start gap-4 px-4 py-7 text-base font-medium text-muted-foreground hover:bg-white/5 rounded-2xl">
-            <Settings className="h-5 w-5" />
-            Configurações
-          </Button>
+          <Link href="/settings">
+            <Button variant="ghost" className="w-full justify-start gap-4 px-4 py-7 text-base font-medium text-muted-foreground hover:bg-white/5 rounded-2xl">
+              <Settings className="h-5 w-5" />
+              Configurações
+            </Button>
+          </Link>
         </div>
       </div>
     </aside>
