@@ -20,6 +20,8 @@ export const metadata: Metadata = {
 import { Providers } from "@/components/providers";
 import { Sidebar } from "@/components/layout/sidebar";
 import { BottomNav } from "@/components/layout/bottom-nav";
+import { Toaster } from "sonner";
+import { NotificationListener } from "@/components/notification-listener";
 
 export default function RootLayout({
   children,
@@ -32,6 +34,8 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background`}
       >
         <Providers>
+          <Toaster richColors closeButton position="top-center" />
+          <NotificationListener />
           <div className="flex min-h-screen flex-col md:flex-row">
             <Sidebar />
             <main className="flex-1 pb-32 md:pb-0 md:pl-72">

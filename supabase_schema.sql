@@ -97,6 +97,44 @@ RETURNS UUID AS $$
   SELECT partner_id FROM profiles WHERE id = auth.uid();
 $$ LANGUAGE sql SECURITY DEFINER;
 
+-- =============================================
+-- LOVE COUNTER SYSTEM
+-- =============================================
+
+-- =============================================
+-- MEAL PLANNER SYSTEM
+-- =============================================
+CREATE TABLE IF NOT EXISTS recipes (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  title TEXT NOT NULL,
+  ingredients TEXT,
+  instructions TEXT,
+  image_url TEXT,
+  category TEXT DEFAULT 'Geral',
+  couple_id UUID NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS meal_plans (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  date DATE NOT NULL,
+  meal_type TEXT CHECK (meal_type IN ('almoco', 'jantar')),
+  recipe_id UUID REFERENCES recipes(id) ON DELETE SET NULL,
+  custom_text TEXT,
+  couple_id UUID NOT NULL
+);
+
+ALTER TABLE recipes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE meal_plans ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Couple access recipes" ON recipes FOR ALL USING (
+  couple_id IN (SELECT id FROM profiles WHERE id = auth.uid() OR partner_id = auth.uid()) OR couple_id = auth.uid() -- fallback for safety
+);
+
+CREATE POLICY "Couple access meal_plans" ON meal_plans FOR ALL USING (
+  couple_id IN (SELECT id FROM profiles WHERE id = auth.uid() OR partner_id = auth.uid()) OR couple_id = auth.uid()
+);
+
 -- Tasks Policies
 CREATE POLICY "Couples can manage their tasks" ON tasks
   FOR ALL USING (

@@ -2,16 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CheckSquare, Sparkles, Wallet, Heart, Settings } from "lucide-react";
+import { Home, Wallet, CheckSquare, Heart, Settings, Utensils, Sparkles, Film } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 const items = [
-  { icon: Home, label: "Dashboard", href: "/" },
-  { icon: CheckSquare, label: "Tasks", href: "/tasks" },
-  { icon: Sparkles, label: "Planner AI", href: "/planner" },
-  { icon: Wallet, label: "Finance", href: "/finance" },
+  { icon: Home, label: "Home", href: "/" },
+  { icon: Sparkles, label: "Planner I.A.", href: "/planner" },
+  { icon: Film, label: "Cinema", href: "/cinema" },
+  { icon: Wallet, label: "Finanças", href: "/finance" },
+  { icon: CheckSquare, label: "Tarefas", href: "/tasks" },
+  { icon: Utensils, label: "Refeições", href: "/meals" },
   { icon: Heart, label: "Wishlist", href: "/wishlist" },
+  { icon: Settings, label: "Ajustes", href: "/settings" },
 ];
 
 export function Sidebar() {

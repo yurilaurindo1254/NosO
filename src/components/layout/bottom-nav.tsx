@@ -2,16 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CheckSquare, Sparkles, Wallet, Heart, Settings } from "lucide-react";
+import { Home, CheckSquare, Sparkles, Wallet, Heart, Settings, Utensils, Film } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
   { icon: Home, label: "Home", href: "/" },
-  { icon: CheckSquare, label: "Tasks", href: "/tasks" },
   { icon: Sparkles, label: "IA", href: "/planner" },
-  { icon: Wallet, label: "Finance", href: "/finance" },
-  { icon: Heart, label: "Wishlist", href: "/wishlist" },
-  { icon: Settings, label: "Config", href: "/settings" },
+  { icon: Film, label: "Cine", href: "/cinema" },
+  { icon: Wallet, label: "R$", href: "/finance" },
+  { icon: CheckSquare, label: "Tasks", href: "/tasks" },
+  { icon: Utensils, label: "Comer", href: "/meals" },
+  { icon: Heart, label: "Desejos", href: "/wishlist" },
+  { icon: Settings, label: "Ajuster", href: "/settings" },
 ];
 
 export function BottomNav() {
