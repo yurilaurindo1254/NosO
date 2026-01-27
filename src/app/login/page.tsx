@@ -7,7 +7,7 @@ import * as z from "zod";
 import { Heart, Mail, Lock, Loader2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { supabase } from "@/lib/supabase";
@@ -70,11 +70,8 @@ export default function AuthPage() {
       alert("Erro ao cadastrar: " + error.message);
     } else {
       if (data.user) {
-        // Criação manual do perfil, caso trigger não exista
-        await supabase.from('profiles').insert({
-          id: data.user.id,
-          full_name: values.fullName,
-        });
+        // Perfil é criado automaticamente via Trigger no banco
+        console.log("Usuário criado:", data.user.id);
       }
       alert("Cadastro realizado! Verifique seu email ou entre.");
       router.push("/");
@@ -85,7 +82,7 @@ export default function AuthPage() {
   return (
     <div className="fixed inset-0 z-100 flex items-center justify-center bg-background px-4">
       {/* Background Decorativo */}
-      <div className="absolute inset-0 bg-[#e0e7ff] dark:bg-[#0f172a] -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-200 via-background to-background dark:from-indigo-950 dark:via-background dark:to-background"></div>
+      <div className="absolute inset-0 bg-[#e0e7ff] dark:bg-[#0f172a] -z-10 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-indigo-200 via-background to-background dark:from-indigo-950 dark:via-background dark:to-background"></div>
 
       <div className="w-full max-w-md space-y-8 z-10">
         <div className="flex flex-col items-center gap-4 text-center">
@@ -93,7 +90,7 @@ export default function AuthPage() {
             <Heart className="h-10 w-10 fill-current animate-pulse" />
           </div>
           <div className="space-y-1">
-            <h1 className="text-4xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600 dark:to-purple-400">NósOS</h1>
+            <h1 className="text-4xl font-black tracking-tighter text-primary">NósOS</h1>
             <p className="text-muted-foreground font-medium">O sistema operacional do seu amor.</p>
           </div>
         </div>

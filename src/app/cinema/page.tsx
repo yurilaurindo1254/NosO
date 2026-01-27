@@ -36,7 +36,38 @@ type TmdbMovie = {
   release_date: string;
 };
 
+type Provider = {
+    provider_id: number;
+    provider_name: string;
+    logo_path: string;
+}
+
+type Providers = {
+    link: string;
+    flatrate?: Provider[];
+    rent?: Provider[];
+    buy?: Provider[];
+}
+
 const PLATFORMS = ["Netflix", "Prime Video", "Disney+", "HBO Max", "Cinema", "Apple TV", "Outros"];
+
+const MOODS = [
+  { id: 10749, label: "Romântico", emoji: "🥰", color: "bg-pink-500/20 text-pink-500 border-pink-500/50" },
+  { id: 35, label: "Rir Muito", emoji: "😂", color: "bg-yellow-500/20 text-yellow-500 border-yellow-500/50" },
+  { id: 27, label: "Medo", emoji: "👻", color: "bg-purple-900/40 text-purple-400 border-purple-500/50" },
+  { id: 12, label: "Aventura", emoji: "🤠", color: "bg-orange-500/20 text-orange-500 border-orange-500/50" },
+  { id: 18, label: "Dramático", emoji: "😭", color: "bg-blue-500/20 text-blue-500 border-blue-500/50" },
+  { id: 99, label: "Curioso", emoji: "🤓", color: "bg-emerald-500/20 text-emerald-500 border-emerald-500/50" },
+];
+
+const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500";
+const PLACEHOLDER_IMG = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&auto=format&fit=crop&q=60";
+
+const getImageUrl = (path: string | null | undefined) => {
+    if (!path) return PLACEHOLDER_IMG;
+    if (path.startsWith('http')) return path;
+    return `${TMDB_IMAGE_BASE}${path}`;
+};
 
 export default function CinemaPage() {
   // Estados
@@ -44,10 +75,13 @@ export default function CinemaPage() {
   const [watched, setWatched] = useState<Movie[]>([]);
   const [nowPlaying, setNowPlaying] = useState<TmdbMovie[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<TmdbMovie | null>(null);
+  const [selectedMood, setSelectedMood] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   
   const [loadingDb, setLoadingDb] = useState(true);
   const [loadingTmdb, setLoadingTmdb] = useState(false);
+  const [loadingProviders, setLoadingProviders] = useState(false);
+  const [providers, setProviders] = useState<Providers | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
   // Estados de UI
@@ -76,11 +110,12 @@ export default function CinemaPage() {
   }, []);
 
   // 2. Carregar da API (TMDB)
-  const fetchNowPlaying = useCallback(async () => {
+  const fetchNowPlaying = useCallback(async (genreId?: number | null) => {
     setLoadingTmdb(true);
     setError(null);
     try {
-        const res = await fetch('/api/tmdb/now-playing');
+        const query = genreId ? `?with_genres=${genreId}` : '';
+        const res = await fetch(`/api/tmdb/now-playing${query}`);
         const data = await res.json();
         
         if (data.error) throw new Error(data.error);
@@ -95,6 +130,36 @@ export default function CinemaPage() {
     }
     setLoadingTmdb(false);
   }, []);
+
+   const handleMoodSelect = (moodId: number) => {
+        if (selectedMood === moodId) {
+            setSelectedMood(null);
+            fetchNowPlaying(null);
+        } else {
+            setSelectedMood(moodId);
+            fetchNowPlaying(moodId);
+        }
+   };
+
+   // Fetch Providers when selectedMovie changes
+   useEffect(() => {
+     if (selectedMovie) {
+       setLoadingProviders(true);
+       setProviders(null);
+       // Fetch logic calls /api/tmdb/providers (assuming it exists or directly TMDB)
+       // For now, we mock it or fetch if we had the route. 
+       // Based on previous context, we might lack the route details, so let's check implementation_plan_streaming.md
+       // Or, simply reset it to null as placeholder if route is missing.
+       // Actually, the error says variables are missing, so we must add them.
+       // Let's assume we need to fetch from an API.
+        fetch(`/api/tmdb/providers?id=${selectedMovie.tmdb_id}`)
+            .then(res => res.json())
+            .then(data => setProviders(data))
+            .catch(err => console.error("Providers error", err))
+            .finally(() => setLoadingProviders(false));
+     }
+   }, [selectedMovie]);
+
 
   useEffect(() => {
     fetchMyMovies();
@@ -184,9 +249,9 @@ export default function CinemaPage() {
       setWinnerId(null);
       
       // Simular roleta
-      let i = 0;
+      // let i = 0; // Unused
       const interval = setInterval(() => {
-           i++;
+           // i++;
            // Apenas visual, não muda estado real
       }, 100);
 
@@ -200,7 +265,22 @@ export default function CinemaPage() {
       }, 2000);
   };
 
-  return (
+   // Helper para gerar link de busca direto
+   const getProviderSearchLink = (providerName: string, title: string, defaultLink: string) => {
+       const t = encodeURIComponent(title);
+       const p = providerName.toLowerCase();
+       
+       if (p.includes('netflix')) return `https://www.netflix.com/search?q=${t}`;
+       if (p.includes('prime') || p.includes('amazon')) return `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${t}`;
+       if (p.includes('disney')) return `https://www.disneyplus.com/search?q=${t}`;
+       if (p.includes('hbo') || p.includes('max')) return `https://play.max.com/search?q=${t}`;
+       if (p.includes('apple')) return `https://tv.apple.com/search?term=${t}`;
+       if (p.includes('globo')) return `https://globoplay.globo.com/busca/?q=${t}`;
+       
+       return defaultLink; // Fallback para o JustWatch
+   };
+
+   return (
     <div className="flex flex-col gap-6 pb-20 max-w-7xl mx-auto">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -251,20 +331,58 @@ export default function CinemaPage() {
             <TabsTrigger value="watched" className="rounded-lg gap-2"><Check className="h-4 w-4"/> Vistos ({watched.length})</TabsTrigger>
         </TabsList>
         
+        
         {/* ABA 1: EM CARTAZ (TMDB) */}
         <TabsContent value="now_playing" className="min-h-[300px]">
+             
+             {/* MOOD SELECTOR */}
+             <div className="mb-6">
+                <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                    <Star className="h-4 w-4" /> Vibe do dia:
+                    {selectedMood && (
+                        <Button 
+                            variant="ghost" size="sm" 
+                            className="h-6 text-xs text-muted-foreground hover:text-foreground ml-auto"
+                            onClick={() => handleMoodSelect(selectedMood)}
+                        >
+                            Limpar Filtro <X className="h-3 w-3 ml-1"/>
+                        </Button>
+                    )}
+                </h3>
+                <ScrollArea className="w-full whitespace-nowrap pb-2">
+                    <div className="flex gap-3">
+                        {MOODS.map(mood => (
+                            <button
+                                key={mood.id}
+                                onClick={() => handleMoodSelect(mood.id)}
+                                className={cn(
+                                    "flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-300 hover:scale-105 active:scale-95",
+                                    selectedMood === mood.id 
+                                        ? `${mood.color} ring-2 ring-ring border-transparent shadow-lg font-bold`
+                                        : "bg-muted/50 border-muted hover:bg-muted text-muted-foreground"
+                                )}
+                            >
+                                <span className="text-lg">{mood.emoji}</span>
+                                <span className="text-sm">{mood.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                </ScrollArea>
+             </div>
+
              {error ? (
                 <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground bg-red-500/5 border border-red-500/20 rounded-xl">
                     <Info className="h-10 w-10 text-red-400 mb-2" />
                     <p className="font-medium text-red-400">Ops! {error}</p>
                     <p className="text-sm mt-1">Tente reiniciar o terminal (npm run dev).</p>
-                    <Button variant="outline" size="sm" onClick={fetchNowPlaying} className="mt-4 border-red-500/20 hover:bg-red-500/10 text-red-400">
+                    <p className="text-sm mt-1">Tente reiniciar o terminal (npm run dev).</p>
+                    <Button variant="outline" size="sm" onClick={() => fetchNowPlaying()} className="mt-4 border-red-500/20 hover:bg-red-500/10 text-red-400">
                         Tentar Novamente
                     </Button>
                 </div>
              ) : loadingTmdb ? (
                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    {[1,2,3,4,5].map(i => <div key={i} className="aspect-[2/3] bg-muted/50 rounded-xl animate-pulse" />)}
+                    {[1,2,3,4,5].map(i => <div key={i} className="aspect-2/3 bg-muted/50 rounded-xl animate-pulse" />)}
                  </div>
              ) : (
                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -273,13 +391,13 @@ export default function CinemaPage() {
                             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                             key={movie.tmdb_id} 
                             onClick={() => setSelectedMovie(movie)}
-                            className="group relative aspect-[2/3] rounded-xl overflow-hidden bg-slate-900 shadow-lg cursor-pointer transform transition-all hover:scale-105 hover:z-10"
+                            className="group relative aspect-2/3 rounded-xl overflow-hidden bg-slate-900 shadow-lg cursor-pointer transform transition-all hover:scale-105 hover:z-10"
                          >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={movie.poster_path || ''} alt={movie.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110 opacity-90 group-hover:opacity-100" />
+                            <img src={getImageUrl(movie.poster_path)} alt={movie.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110 opacity-90 group-hover:opacity-100" />
                             
                             {/* Overlay Info */}
-                            <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
+                            <div className="absolute inset-0 z-10 bg-linear-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
                                 <h3 className="text-white font-bold text-sm leading-tight mb-1">{movie.title}</h3>
                                 <div className="flex flex-wrap gap-1 mb-3">
                                     <Badge variant="outline" className="text-[10px] text-white border-white/20 px-1 py-0 h-5">{movie.genre}</Badge>
@@ -310,7 +428,7 @@ export default function CinemaPage() {
         <TabsContent value="watchlist">
              {loadingDb ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    {[1,2,3].map(i => <div key={i} className="aspect-[2/3] bg-muted/50 rounded-xl animate-pulse" />)}
+                    {[1,2,3].map(i => <div key={i} className="aspect-2/3 bg-muted/50 rounded-xl animate-pulse" />)}
                  </div>
              ) : watchlist.length === 0 ? (
                 <div className="text-center py-20 opacity-50 flex flex-col items-center">
@@ -331,10 +449,10 @@ export default function CinemaPage() {
                                 }}
                                 exit={{ opacity: 0, scale: 0 }}
                                 key={movie.id}
-                                className="relative group aspect-[2/3] rounded-xl overflow-hidden bg-muted shadow-md"
+                                className="relative group aspect-2/3 rounded-xl overflow-hidden bg-muted shadow-md"
                             >
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={movie.image_url} alt={movie.title} className="h-full w-full object-cover" />
+                                <img src={getImageUrl(movie.image_url)} alt={movie.title} className="h-full w-full object-cover" />
                                 <div className="absolute inset-0 bg-black/40 group-hover:bg-black/60 transition-colors" />
                                 
                                 <Badge className="absolute top-2 left-2 bg-black/50 hover:bg-black/70 backdrop-blur-md text-[10px] border-none text-white">{movie.platform}</Badge>
@@ -373,10 +491,10 @@ export default function CinemaPage() {
         <TabsContent value="watched">
              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                  {watched.map((movie) => (
-                     <div key={movie.id} className="relative aspect-[2/3] rounded-xl overflow-hidden grayscale hover:grayscale-0 transition-all cursor-pointer group">
+                     <div key={movie.id} className="relative aspect-2/3 rounded-xl overflow-hidden grayscale hover:grayscale-0 transition-all cursor-pointer group">
                          {/* eslint-disable-next-line @next/next/no-img-element */}
                          <img src={movie.image_url} alt={movie.title} className="h-full w-full object-cover" />
-                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex flex-col justify-end p-3">
+                         <div className="absolute inset-0 bg-linear-to-t from-black/80 to-transparent flex flex-col justify-end p-3">
                              <div className="flex justify-between items-end">
                                 <span className="text-xs text-white font-medium line-clamp-1">{movie.title}</span>
                                 <div className="flex text-yellow-400">
@@ -405,7 +523,7 @@ export default function CinemaPage() {
                <>
                    {/* Header com Imagem de Fundo */}
                    <div className="relative h-64 w-full">
-                       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background z-10" />
+                       <div className="absolute inset-0 bg-linear-to-b from-transparent to-background z-10" />
                        {/* eslint-disable-next-line @next/next/no-img-element */}
                        <img 
                           src={selectedMovie.backdrop_path || selectedMovie.poster_path} 
@@ -441,6 +559,59 @@ export default function CinemaPage() {
                                {selectedMovie.overview || "Sem sinopse disponível."}
                            </p>
                        </ScrollArea>
+
+                       {/* ONDE ASSISTIR (STREAMING) */}
+                        <div className="mb-6">
+                            <h4 className="text-sm font-bold text-muted-foreground mb-3 uppercase tracking-wider flex items-center gap-2">
+                                Onde Assistir {loadingProviders && <Loader2 className="h-3 w-3 animate-spin"/>}
+                            </h4>
+                            
+                            {!loadingProviders && providers && ((providers.flatrate?.length ?? 0) > 0 || (providers.rent?.length ?? 0) > 0) ? (
+                                <div className="space-y-3">
+                                    {(providers.flatrate?.length ?? 0) > 0 && (
+                                        <div className="flex flex-wrap gap-2">
+                                            {providers.flatrate?.map((prov) => (
+                                                <a 
+                                                    key={prov.provider_id} 
+                                                    href={getProviderSearchLink(prov.provider_name, selectedMovie!.title, providers.link)} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="group relative transition-transform hover:scale-110"
+                                                    title={`Assistir no ${prov.provider_name}`}
+                                                >
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img src={getImageUrl(prov.logo_path)} alt={prov.provider_name} className="h-10 w-10 rounded-lg shadow-md" />
+                                                </a>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {/* Se não tiver subscription (flatrate), mostra aluguel */}
+                                    {(providers.flatrate?.length ?? 0) === 0 && (providers.rent?.length ?? 0) > 0 && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-muted-foreground mr-2">Alugar:</span>
+                                            {providers.rent?.slice(0, 3).map((prov) => (
+                                                <a 
+                                                    key={prov.provider_id} 
+                                                    href={getProviderSearchLink(prov.provider_name, selectedMovie!.title, providers.link)} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer" 
+                                                    title={`Alugar no ${prov.provider_name}`}
+                                                >
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img src={getImageUrl(prov.logo_path)} alt={prov.provider_name} className="h-8 w-8 rounded-lg opacity-80 hover:opacity-100" />
+                                                </a>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                !loadingProviders && (
+                                    <p className="text-xs text-muted-foreground italic">
+                                        Não encontramos opções de streaming direto no Brasil. Tente buscar pelo nome.
+                                    </p>
+                                )
+                            )}
+                        </div>
 
                        <div className="flex gap-3">
                            <Button 

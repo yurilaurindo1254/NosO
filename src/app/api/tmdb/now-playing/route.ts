@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: Request) {
   const apiKey = process.env.TMDB_API_KEY;
   const token = process.env.TMDB_READ_TOKEN;
+
+  // Get search params
+  const { searchParams } = new URL(request.url);
+  const genreId = searchParams.get('with_genres');
 
   if (!apiKey && !token) {
     console.error("❌ TMDB API Keys missing! Make sure to restart the server after editing .env.local");
@@ -10,8 +14,15 @@ export async function GET() {
   }
 
   try {
+    let url = 'https://api.themoviedb.org/3/movie/now_playing?language=pt-BR&region=BR&page=1';
+    
+    // If a genre is selected, use discover endpoint instead
+    if (genreId) {
+        url = `https://api.themoviedb.org/3/discover/movie?language=pt-BR&sort_by=popularity.desc&with_genres=${genreId}&page=1`;
+    }
+
     const res = await fetch(
-      'https://api.themoviedb.org/3/movie/now_playing?language=pt-BR&region=BR&page=1',
+      url,
       {
         headers: {
           accept: 'application/json',
@@ -34,7 +45,11 @@ export async function GET() {
       53: "Thriller", 10752: "Guerra", 37: "Faroeste"
     };
 
-    const movies = data.results.map((m: any) => ({
+    // Safe parsing in case data.results is undefined
+    const results = Array.isArray(data.results) ? data.results : [];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const movies = results.map((m: any) => ({
       tmdb_id: m.id,
       title: m.title,
       overview: m.overview,
@@ -47,6 +62,7 @@ export async function GET() {
 
     return NextResponse.json(movies);
   } catch (error) {
+    console.error("API Route Error:", error);
     return NextResponse.json({ error: 'Erro ao conectar com TMDB' }, { status: 500 });
   }
 }

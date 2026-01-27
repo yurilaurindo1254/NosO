@@ -24,9 +24,11 @@ export default function PlannerPage() {
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  /* eslint-disable @typescript-eslint/no-unused-vars */
   const [lastSuggestion, setLastSuggestion] = useState<Suggestion | null>(null);
+  /* eslint-enable @typescript-eslint/no-unused-vars */
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
 
     const userMsg = { id: Date.now().toString(), role: "user", content: input };
@@ -34,24 +36,36 @@ export default function PlannerPage() {
     setInput("");
     setIsTyping(true);
 
-    // Mock AI Response
-    setTimeout(() => {
-      setIsTyping(false);
-      const aiMsg = { id: (Date.now() + 1).toString(), role: "assistant", content: "Com base no que vocês gostam, aqui está uma sugestão especial para hoje:" };
-      setMessages(prev => [...prev, aiMsg]);
-      setLastSuggestion({
-        title: "Noite de Fondue & Cinema",
-        description: "Preparem um fondue de chocolate com frutas e queijo com pães artesanais. Escolham um clássico romântico ou uma nova série para maratonar sob as cobertas.",
-        location: "Em casa",
-        cost: "R$ 80 - 150",
-        duration: "3 - 4 horas",
-        tags: ["Romântico", "Aconchegante", "Econômico"]
-      });
-    }, 1500);
+    try {
+        const res = await fetch('/api/ai/planner', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: userMsg.content, context: "Planejamento de casal" })
+        });
+
+        const data = await res.json();
+        setIsTyping(false);
+
+        if (data.result) {
+            const aiMsg = { id: (Date.now() + 1).toString(), role: "assistant", content: data.result };
+            setMessages(prev => [...prev, aiMsg]);
+            
+            // Tenta extrair sugestão estruturada se o AI mandar um JSON (futuro), 
+            // por enquanto, vamos focar no chat, e se a resposta tiver "Sugestão:" a gente tenta parsear algo simples.
+            // Para simplificar agora: Apenas Chat.
+        } else {
+            console.error(data.error);
+             setMessages(prev => [...prev, { id: Date.now().toString(), role: "assistant", content: "Desculpe, tive um erro ao processar. Tente novamente." }]);
+        }
+    } catch (e) {
+        console.error(e);
+        setIsTyping(false);
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: "assistant", content: "Erro de conexão. Verifique sua internet." }]);
+    }
   };
 
   return (
-    <div className="max-w-4xl mx-auto h-[calc(100vh-8rem)] flex flex-col gap-6">
+    <div className="max-w-6xl mx-auto h-[calc(100vh-8rem)] flex flex-col gap-6">
       <header className="flex flex-col gap-2">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm border border-primary/20">

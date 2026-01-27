@@ -71,7 +71,7 @@ export function LoveCounter({ startDate, status = "Juntos" }: LoveCounterProps) 
         <div className="flex items-center gap-2">
             <Heart className="h-5 w-5 text-rose-500 fill-rose-500 animate-pulse" />
             <span className="font-bold text-lg tracking-tight uppercase text-rose-600 dark:text-rose-400">
-                {status} há...
+                Juntos há...
             </span>
         </div>
 

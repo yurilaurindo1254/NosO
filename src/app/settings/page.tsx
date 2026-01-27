@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, User, Heart, Shield, Bell, Link as LinkIcon, Check, Loader2, CalendarHeart } from "lucide-react";
+import { LogOut, User, Heart, Bell, Link as LinkIcon, Loader2, CalendarHeart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,11 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/lib/supabase";
-import { cn } from "@/lib/utils";
+import { toast } from "sonner"; // Fixed: Added missing import
 
 interface PartnerProfile {
+  id?: string;
   full_name: string;
-  email: string;
+  email?: string;
+  avatar_url?: string;
 }
 
 interface UserProfile {
@@ -24,7 +26,9 @@ interface UserProfile {
   partner_id: string | null;
   relationship_start_date: string | null;
   relationship_status: string | null;
+  incoming_connection_request_from?: string | null; // Fixed type
   partner?: PartnerProfile;
+  requester?: PartnerProfile; // Added for pending requests
 }
 
 export default function SettingsPage() {
@@ -32,74 +36,121 @@ export default function SettingsPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [partner, setPartner] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(false);
+  
+  // Estados de convite
   const [inviteEmail, setInviteEmail] = useState("");
   const [linking, setLinking] = useState(false);
+  const [pendingRequest, setPendingRequest] = useState<PartnerProfile | null>(null);
 
   // Estados para atualização de relacionamento
   const [startDate, setStartDate] = useState("");
   const [status, setStatus] = useState("Namorando");
   const [savingRel, setSavingRel] = useState(false);
 
-  const fetchProfile = useCallback(async () => {
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    
-    if (authUser) {
-      const { data: myProfile } = await supabase
-        .from('profiles')
-        .select('*, partner:partner_id(full_name, email)')
-        .eq('id', authUser.id)
-        .single();
-      
-      if (myProfile) {
-        setUser({ ...myProfile, email: myProfile.email || authUser.email });
-        if(myProfile.relationship_start_date) setStartDate(myProfile.relationship_start_date);
-        if(myProfile.relationship_status) setStatus(myProfile.relationship_status);
+  useEffect(() => {
+    let mounted = true;
+    const loadProfile = async () => {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser && mounted) {
+             const { data: myProfile, error } = await supabase.from('profiles').select('*').eq('id', authUser.id).single();
+             if (error) {
+                 toast.error("Erro ao carregar perfil: " + (error.message || "Desconhecido"));
+                 return;
+             }
+             if (myProfile && mounted) {
+                setUser({ ...myProfile, email: myProfile.email || authUser.email });
+                if(myProfile.relationship_start_date) setStartDate(myProfile.relationship_start_date);
+                if(myProfile.relationship_status) setStatus(myProfile.relationship_status);
 
-        if (myProfile.partner_id) {
-          // If partner is loaded via join, use it. Otherwise fetch explicitly if needed, but join is better.
-          // The previous code fetched explicitly. Let's stick to the join if it works, or fallback to user logic.
-          // Since the join `partner:partner_id(...)` is used, myProfile.partner should be populated.
-          // But to be consistent with user's logic, let's keep it simple.
-          if (myProfile.partner) {
-              setPartner(myProfile.partner as unknown as UserProfile); // Type assertion for simplicity
-          } else {
-              // Fallback fetch if join didn't work (e.g. RLS issues on read)
-             const { data: partnerProfile } = await supabase
-               .from('profiles')
-               .select('*')
-               .eq('id', myProfile.partner_id)
-               .single();
-             setPartner(partnerProfile);
-          }
+                if (myProfile.partner_id) {
+                    const { data: partnerProfile } = await supabase.from('profiles').select('*').eq('id', myProfile.partner_id).single();
+                    if (partnerProfile && mounted) setPartner(partnerProfile);
+                } else {
+                    if(mounted) setPartner(null);
+                }
+
+                if (myProfile.incoming_connection_request_from) {
+                    const { data: requesterProfile } = await supabase.from('profiles').select('*').eq('id', myProfile.incoming_connection_request_from).single();
+                    if (requesterProfile && mounted) setPendingRequest(requesterProfile);
+                } else {
+                    if(mounted) setPendingRequest(null);
+                }
+             }
         }
-      }
-    }
+    };
+    loadProfile();
+    return () => { mounted = false; };
   }, []);
 
-  useEffect(() => { fetchProfile(); }, [fetchProfile]);
-
-  const handleLinkPartner = async () => {
+  const handleSendInvite = async () => {
     if (!inviteEmail) return;
     setLinking(true);
-    // @ts-ignore - RPC params might be inferred strictly
-    const { data, error } = await supabase.rpc('link_partner', { partner_email: inviteEmail });
+
+    const { data, error } = await supabase.rpc('send_connection_request', { partner_email: inviteEmail });
     
     if (error) {
-       alert("Erro: " + error.message);
+       toast.error("Erro: " + error.message);
     } else {
       const result = data as { success: boolean; message: string };
-      // @ts-ignore
-      alert(result.message || (result as any).text); // Handle potential format diffs
+
+      const msg = result.message || (result as { text?: string }).text;
       if (result.success) {
+        toast.success(msg);
         setInviteEmail("");
-        fetchProfile();
+      } else {
+        toast.error(msg);
       }
     }
     setLinking(false);
   };
 
+  const handleAcceptRequest = async () => {
+    setLinking(true);
+
+    const { error } = await supabase.rpc('accept_connection_request');
+    if (error) toast.error("Erro: " + error.message);
+    else {
+        toast.success("Convite aceito! ❤️");
+        // Update profile
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+         if (authUser) {
+           const { data: myProfile } = await supabase.from('profiles').select('*').eq('id', authUser.id).single();
+           if(myProfile) {
+              setUser({ ...myProfile, email: myProfile.email || authUser.email });
+              // Re-fetch partner
+              if (myProfile.partner_id) {
+                 const { data: partnerProfile } = await supabase.from('profiles').select('*').eq('id', myProfile.partner_id).single();
+                 if (partnerProfile) setPartner(partnerProfile);
+              }
+              setPendingRequest(null);
+           }
+         }
+    }
+    setLinking(false);
+  };
+
+  const handleRejectRequest = async () => {
+    setLinking(true);
+
+    const { error } = await supabase.rpc('reject_connection_request');
+    if (!error) {
+        toast.success("Convite recusado.");
+        setPendingRequest(null);
+        // Refresh page to ensure consistency or just clear state
+    }
+    setLinking(false);
+  };
+
   const handleSaveRelationship = async () => {
-    if(!user) return;
+    if (!user) {
+        toast.error("Erro: Perfil não carregado. Tente recarregar a página.");
+        return;
+    }
+    if (!startDate) {
+        toast.error("Por favor, selecione uma data de início!");
+        return;
+    }
+
     setSavingRel(true);
     const { error } = await supabase
         .from('profiles')
@@ -109,8 +160,14 @@ export default function SettingsPage() {
         })
         .eq('id', user.id);
     
-    if(error) alert("Erro ao salvar: " + error.message);
-    else alert("Dados do amor atualizados! ❤️");
+    if(error) {
+        console.error(error);
+        toast.error("Erro ao salvar: " + error.message);
+    } else {
+        toast.success("Dados do amor atualizados! ❤️");
+        // Update local state to reflect persistence
+        setUser(prev => prev ? ({ ...prev, relationship_start_date: startDate, relationship_status: status }) : null);
+    }
     setSavingRel(false);
   };
 
@@ -154,6 +211,24 @@ export default function SettingsPage() {
                         </div>
                     </div>
                 </div>
+             ) : pendingRequest ? (
+                <div className="space-y-4 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20 border-dashed">
+                    <div className="flex items-center gap-3">
+                        <Bell className="h-5 w-5 text-yellow-500 animate-bounce" />
+                        <div>
+                            <p className="font-bold text-sm text-yellow-600 dark:text-yellow-400">Solicitação de Conexão!</p>
+                            <p className="text-xs text-muted-foreground">
+                                <span className="font-semibold">{pendingRequest.full_name}</span> quer conectar a conta del(a) com a sua.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                        <Button variant="outline" size="sm" onClick={handleRejectRequest} disabled={linking}>Recusar</Button>
+                        <Button size="sm" onClick={handleAcceptRequest} disabled={linking}>
+                            {linking ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aceitar Convite"}
+                        </Button>
+                    </div>
+                </div>
              ) : (
                 <div className="space-y-4 p-4 rounded-xl bg-muted/30 border border-dashed">
                     <div className="flex items-center gap-2">
@@ -162,12 +237,12 @@ export default function SettingsPage() {
                     </div>
                     <div className="flex gap-2">
                         <Input placeholder="Digite o email del@..." value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} className="bg-background" />
-                        <Button onClick={handleLinkPartner} disabled={linking}>
-                            {linking ? <Loader2 className="h-4 w-4 animate-spin" /> : "Conectar"}
+                        <Button onClick={handleSendInvite} disabled={linking}>
+                            {linking ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enviar Convite"}
                         </Button>
                     </div>
                     <p className="text-[10px] text-muted-foreground">
-                        * A outra pessoa precisa já ter criado uma conta no NósOS com este email.
+                        * A outra pessoa receberá um aviso aqui no painel para aceitar a conexão.
                     </p>
                 </div>
              )}

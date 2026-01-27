@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Plus, MoreHorizontal, Calendar, Info, Loader2 } from "lucide-react";
+import { Plus, MoreHorizontal, Calendar, Info, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,6 +30,8 @@ export default function TasksPage() {
   // Estados do formulário
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskCategory, setNewTaskCategory] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<{title: string, category: string}[]>([]);
 
   // 1. Buscar tarefas
   const fetchTasks = useCallback(async () => {
@@ -161,7 +163,75 @@ export default function TasksPage() {
             <DialogHeader>
               <DialogTitle>Adicionar Nova Tarefa</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-4">
+            
+            {/* Quick Chips & AI Section */}
+            <div className="flex flex-col gap-4 py-2">
+                {/* 1. Quick Chips */}
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                    {["🛒 Mercado", "🍽️ Lavar Louça", "🧹 Varrer Sala", "🐶 Passear c/ Dog", "💊 Tomar Remédio"].map((chip) => (
+                        <button 
+                            key={chip}
+                            onClick={() => {
+                                const parts = chip.split(" ");
+                                // const icon = parts[0]; // unused
+                                const text = parts.slice(1).join(" ");
+                                setNewTaskTitle(text);
+                                setNewTaskCategory("Rotina"); // Default category
+                            }}
+                            className="shrink-0 px-3 py-1 bg-muted rounded-full text-xs hover:bg-primary/10 hover:text-primary transition-colors whitespace-nowrap"
+                        >
+                            {chip}
+                        </button>
+                    ))}
+                </div>
+
+                {/* 2. AI Suggestions */}
+                <div className="space-y-2">
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full gap-2 border-dashed border-purple-300 text-purple-600 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-900/20"
+                        onClick={async () => {
+                            setAiLoading(true);
+                            setAiSuggestions([]);
+                            try {
+                                const res = await fetch("/api/ai/tasks", { method: "POST" });
+                                const data = await res.json();
+                                if (data.tasks) setAiSuggestions(data.tasks);
+                            } catch {
+                                alert("Erro na IA");
+                            } finally {
+                                setAiLoading(false);
+                            }
+                        }}
+                        disabled={aiLoading}
+                    >
+                        {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                        {aiLoading ? "Pensando..." : "Pedir Sugestões à IA"}
+                    </Button>
+
+                    {aiSuggestions.length > 0 && (
+                        <div className="grid grid-cols-1 gap-2 bg-muted/30 p-2 rounded-lg max-h-40 overflow-y-auto">
+                            {aiSuggestions.map((sug, idx) => (
+                                <div 
+                                    key={idx} 
+                                    className="flex items-center justify-between p-2 bg-background rounded border text-sm hover:border-primary cursor-pointer transition-colors"
+                                    onClick={() => {
+                                        setNewTaskTitle(sug.title);
+                                        setNewTaskCategory(sug.category);
+                                        setAiSuggestions([]); // Clear after selection
+                                    }}
+                                >
+                                    <span>{sug.title}</span>
+                                    <span className="text-[10px] text-muted-foreground bg-muted px-1 rounded">{sug.category}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <div className="space-y-4 py-4 border-t">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Título</label>
                 <Input 
